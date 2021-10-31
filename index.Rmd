@@ -1,0 +1,956 @@
+---
+title: "Chicago Taxi Data Analysis"
+subtitle: "SCV Group"
+author: ""
+date: "27 Oct 2021"
+output:
+  xaringan::moon_reader:
+    css: ["default", "assets/sydney-fonts.css", "assets/sydney.css"]
+    self_contained: false 
+    seal: true 
+    includes:
+      in_header: "assets/mathjax-equation-numbers.html"
+    nature:
+      beforeInit: ["assets/remark-zoom.js", "https://platform.twitter.com/widgets.js"]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: '16:9' # alternatives '16:9' or '4:3' or others e.g. 13:9
+      navigation:
+        scroll: false
+---
+class: title-slide,middle
+background-image: url("pikapika.svg"), url("assets/taxi.jpeg")
+background-position: 10% 90%, 100% 50%
+background-size: 100px, 100% 100%
+<!-- background-color: #0148A4 -->
+
+```{r, echo=FALSE, cache=FALSE, include = FALSE, message = FALSE}
+pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, ggplot2, data.table, readr, qqplotr, GGally, lubridate, raster, spData, spDataLarge, tmap, osmdata, gifski, htmlwidgets)
+
+load("final_maps.RData")
+
+
+
+# load("omap.RData")
+
+```
+
+
+```{r, load_refs, echo=FALSE, cache=FALSE, include = FALSE, message = FALSE, eval = FALSE}
+#Register API key to google
+register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+
+#Get location of chicago
+chicago <- geocode("Chicago, IL")
+
+#Make leaflet map with chicago center
+chicago_leaflet <- leaflet() %>% 
+  setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
+  addProviderTiles(providers$CartoDB.Positron) 
+
+mytable <- read_csv("data/taxi_trips_2020.csv") %>%
+  clean_names() %>%
+  print()
+
+taxi_trips <- mytable
+
+set.seed(123)
+my_sample <- mytable %>%
+  sample_n(10000)
+
+# load("osm.RData")
+mad_map <- get_map(getbb("Chicago"), maptype = "toner-background")
+
+# load("streets.RData")
+
+a1 <- st_read("data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
+  clean_names() %>%
+  dplyr::select(area_numbe, community, geometry) %>%
+  mutate(geometry = st_geometry(geometry),
+         area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable
+  rename(pickup_community_area = area_numbe,
+         community_name = community) 
+
+a1_3857 <- sf::st_transform(a1, 3857)
+```
+## .black[Hi! During your Journey,]
+## .black[Drive safe &] 
+## .white[Scroll each page please] 
+## .black[Enjoy! :-)]
+---
+## Introduction
+.orange[By Daryna]
+.scroll-output[
+## Statement of the goal
+In this report we analyze the Taxi Trips in Chicage 2020 dataset. The aim of the project is to define what variables may influence the revenue of the taxi cabs. We are specifically interested to understand how the cost of trip varies depending on the community area and which areas generate the highest revenue. We then study how the cost of the trip changes through the time variable. 
+
+## Brief summary of the approach
+We first present an exploratory data analysis which allows to familiarize with the data: study the distribution of continous variables, the proportion of categories in categorical variables and the relation between those. We present first the descriptive statistics with respect to the community areas and then with respect to the taxi companies. We then present an interactive maps of Chicago which present which areas depending on the day and time are more or less profitable. 
+
+## Introduction to the problem
+This analysis of similar datasets has been performed before but mostly whith respect to the duration of the trip. We think our analysis may be relevant for taxi companies to facilitate the task of assignment of taxi cabs around the city of Chicago. 
+
+.
+]
+---
+## Basic Analysis
+.orange[By Daryna]
+.scroll-output[
+
+## Exploratory Data Analysis
+
+```{r, echo = FALSE}
+load("d1.RData")
+d1
+```
+
+## Continuous variables Fare and Trip.Total
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/1.png")
+```
+
+Let's create logarithms for the continuous variable 
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/2.png")
+```
+
+
+The distribution of Trip.Total seems to follow a power law sitribution. A lot of data are concentrated between 0 and 100. Some values are very extreme. We should consider to take the logarithm of Trip.Total to visualize the distribution in terms of the percentage.
+
+
+## Boxplot
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/3.png")
+knitr::include_graphics("./assets/Plots_taxis/4.png")
+```
+
+## Categorical Variables 
+
+## Pickup
+Let's explore now the most pick up community areas in which the taxis are found most often
+
+```{r, echo=FALSE}
+load("d2.RData")
+d2
+```
+
+
+
+## Visualisation of Categorical Variables
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/5.png")
+```
+
+
+## DropOff
+
+Let's explore now the most dropoff community areas in which the taxis are found most often
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/6.png")
+```
+
+## Pie charts 
+
+```{r, echo=FALSE}
+load("d3.RData")
+d3
+```
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/7.png")
+```
+
+## Pie Chart for Dropoff
+
+```{r, echo=FALSE}
+load("d4.RData")
+d4
+```
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/8.png")
+```
+
+## Distribution by common areas 
+
+## Boxplots representing Trip Total of the most common Areas
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/9.png")
+```
+
+We can see that for areas 56 and 76, it seems like the revenue is higher 
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/10.png")
+```
+Even we delete the 2 highest outliers the distributions is very skewed, it's better to continue on the log scale
+
+### Distribution of Dropoff Areas 
+
+## Boxplots representing Trip Total of the most common Areas
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/11.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/12.png")
+```
+
+### Histograms
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/13.png")
+```
+Looks like we have a bimodal distribution
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/14.png")
+```
+
+## Hist for Dropoffs
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/15.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/16.png")
+```
+
+## Realtion between continious variables
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/17.png")
+```
+### QQ_Plots
+When plotting theoretical quantiles to empirical quantiles we see that in fact neither Trip Total neither log of trip Total follows normal distribution overall. hen we separate in themost common areas, looks a bit better
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/18.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/19.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/20.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/21.png")
+```
+
+### Time series
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/22.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/23.png")
+```
+
+## For week days 
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/24.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/25.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/26.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/27.png")
+```
+
+## For dropoff
+## Month
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/28.png")
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/Plots_taxis/29.png")
+```
+
+
+.
+]
+
+---
+
+## Further Visualise Top Zones
+.orange[By Yiren]
+.scroll-output[
+First of all, we do the basic analysis on the dataset and look at each variable. For the continues variables, they were visualised using ggpair function in GGally package, a powerful tool that gives scatterplot for each pair of the variables and a histogram for each single variable, as well as the correlation between each pair of variables. For instance, we expect to see a correlation between trip_total and trip_miles. In the scatter plot, we can spot an almost linear line and also the outliners. In the correlation cell, we get a correlation coefficient of 0.467, which indicates a moderate positive association.
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+# sample_gally <- my_sample %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
+# g3 <- GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
+```
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/1.png")
+```
+
+To further visualise the variable trip_total which is of our main interest, we use a geom_histogram in ggplot2 and carefully select the binwidth.
+
+```{r, warning = FALSE, echo = FALSE}
+# ggplot(sample_gally, aes(x = trip_total)) +
+#   geom_histogram(binwidth = 3) + xlim(0, 150)
+knitr::include_graphics("./assets/4.png")
+```
+## Boxplots: Revenue vs. Zone
+With regards to discrete variables, we have 77 zones in Chicago and it is too much to plot out. However, since we are interested in the zones the generate most revenue, we plot out the top 10 zones. To visualise the distribution of the data as well as give a comprehensive comparison among zones, we use boxplots in parallel. From the plots below, it is clear that zone 76 and zone 56 generate the most revenue, whereas they are also the two zones where the average avenue reaches the highest, hence they might be where drivers like most.
+
+While plotting, we found extreme outliners with trip_total > 200. To better visualise the data, we set yscale to exclude them.
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/5.png")
+```
+Further, we will prefer using median over mean because we noticed that most of the distributions of revenue are skewed.
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/6.png")
+
+```
+
+
+As for the dropoff area, it is obvious that zone 76 produced most revenue.
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/7.png")
+```
+
+However, we prefer using pickup_community_area over dropoff_comunity_area to answer our question since we see the pickup zone as the location where new revenue are generated and are of driver’s interest.
+
+
+
+.
+]
+---
+## Total Revenue vs. Zone Analysis by Maps
+.orange[By Olav]
+.scroll-output[
+
+
+To visualize the and highlight the differences between each area we have used interactive maps provided by the leaflet library. We used [this](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Community-Areas-current-/cauq-8yn6) dataset provided by Chicago Data Portal to visualize the borders between community areas. We attribute a color to each area, which indicates the size of the difference relative to the other areas. Our goal was to get a clear understanding of how area and time of the day affects revenue in each area, and being able to communicate these findings as clearly as possible. 
+
+As a basis for this analysis we have plotted a map centered around Chicago. This was done by using the Leaflet library to extract a map over Chicago through Google’s map API. Thereafter we extracted `pickup_community_area`, `community_name` and `geometry` from the dataset of community borders. `pickup_community_area` is a discrete numerical variable uniquely identifying each area and community_name is a string variable which contains its corresponding name. geometry is a MultiPolygon object, which essentially is a list of coordinates representing the borders of each area. 
+
+
+We will first look into how total revenue is distributed among the areas. The relevant variables we will use are `pickup_community_area` and `trip_total`. `pickup_community_area` is identical to its corresponding variable in the area dataset. trip_total is a continuous numeric variable representing the entire cost of the taxi trip for the passenger. To indicate the total revenue in each area, we summarized every trip_total in each area. We then colored the areas in shades of blue representing the size of their respective revenues.  
+Since the revenue differences between areas often vary by several orders of magnitude, we made the bins logarithmic. We must then interpret the coloring as an indication of the order of magnitude of the revenue, not the exact revenue.   
+
+```{r, echo=FALSE}
+# load("o1.RData")
+olav1
+```
+
+.
+]
+
+
+---
+## Total Revenue vs. Zone Analysis by Maps 
+.orange[By Yiren]
+
+.scroll-output[
+
+After looking at the revenue map, we wonder why some of places generate more revenue than others? To further explore the reason, we introduce outside dataset about the amenities as well as the population data from Wikipedia.
+
+
+## Population
+
+We think population might be one of the main factors that affects the total avenue of each zone. Hence we extract the population data from Wikipedia page and join it into our original dataset. 
+
+We apply logarithmic function on population to make the map more sensible. After comparing the two maps, we think the population might be one of the exploratory variables to the total revenue.
+
+
+```{r, include = FALSE, warning = FALSE, message = FALSE, eval = FALSE}
+comm_area = read_csv("data/mywiki.csv")
+comm_area_1 = comm_area %>% 
+  dplyr::select(No., Population) %>% 
+  rename(pickup_community_area = No.) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) 
+
+
+
+## modified olav's codes
+areas <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
+  clean_names() %>%
+  dplyr::select(area_numbe, community, geometry) %>%
+  mutate(geometry = st_geometry(geometry),
+         area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable
+  rename(pickup_community_area = area_numbe,
+         community_name = community) %>%
+  inner_join(comm_area_1, by="pickup_community_area") 
+
+#Trying to color each area by Population
+pal <- colorBin("Oranges",bins=4, domain =log2(areas$Population))
+
+#Generate html labels
+labels <- sprintf(
+  " <strong>%s</strong><br/>Population: %g",
+  areas$community_name, areas$Population
+) %>% lapply(htmltools::HTML)
+
+# 
+# #Register API key to google
+# register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+# 
+# #Get location of chicago
+# chicago <- geocode("Chicago, IL")
+# 
+# #Make leaflet map with chicago center
+# chicago_leaflet <- leaflet() %>%
+#   setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
+#   addProviderTiles(providers$CartoDB.Positron)
+
+#Make the map
+m2 = chicago_leaflet %>%
+  addPolygons(data=areas,
+              fillColor=~pal(log2(areas$Population)),
+              color="lightgrey",
+              weight=2,
+              fillOpacity=0.8,
+              highlightOptions = highlightOptions(
+                weight=3,
+                opacity=2,
+                color="azure1",
+                bringToFront=TRUE),
+              label=labels,
+              labelOptions=labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  
+  addLegend("bottomright",
+            pal = pal,
+            values = log2(areas$Population),
+            title = "Population",
+            opacity = 0.8,
+            labFormat = leaflet::labelFormat(
+              transform = function(x) round(2^(x)))) %>%
+  addResetMapButton()
+```
+
+```{r, echo = FALSE}
+pop_map
+```
+
+## Load Open Street Map Data
+
+Apart from population, we think the location of certain city amenities might be another main factor that affects the total avenue of each zone. Hence we extract amenity information including theatre, restaurant and hospital from Open Street Map Data (osmdata) package and plot it out using the same package. Due to the limit of the dataset, we cannot get all the places where people are likely to take a taxi. But we can still identify the places with most clustered orange dots are popular area for taking taxi, also they might be in the centre of Chicago. 
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/2.png")
+```
+
+To make it easier to compare, we plot out all roads for cars and add the zone border into the map, as well as the amenities on top of them.
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/3.png")
+```
+
+Now, it becomes clearer that the reason for higher revenue in certain zone might be related to the density of certain amenities.
+
+The only exception is O’Hare, where not many amenities are gathered but a hot spot for taxis. It turned out to be that O’Hare is the location of Chicago O'Hare International Airport, which explains why it attracts most of the taxis and produces such a high revenue.
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/my_anim_whole.gif")
+
+```
+
+From the animation, we can spot ...
+
+
+.
+]
+
+
+---
+
+## Shiny App: Trip data by pickup/dropoff areas of Chicago 
+.orange[By Thomas]
+.scroll-output[
+
+.orange[For a better view of this page, you can go to https://uberlu.shinyapps.io/report1_thomas/]
+
+### by pickup areas of Chicago 
+
+In this section we will comment an interactive map of Chicago that displays the _sum_, _mean_ and _max_ for the time of the day we want from 1 A.M. to 12 A.M. for each pickup areas of the city.
+
+```{r shinyApp1, eval = FALSE}
+shinyApp(ui = ui, server = server)
+```
+.orange[Please click:  https://uberlu.shinyapps.io/Pickup/]
+
+For the summation of the revenue per area, we see that for most of the time it is the city center (_Near West Side_, _Loop_ and _Near North Side_) and the airports (_O'Hare_ and _Garfield Ridge_) that have higher values, except during the night for which the values go down for the airports. This could be due to the fact that there is less flights coming to and going from airports at night. For the city center, it should be due to the fact that in every city there is more activity in the center of it.
+
+For the mean of the revenue per area, we can see that it is quite homogeneous on the border of Michigan Lake. But airports are the areas with some of the higher mean, as before, during the day.
+
+For the max of the revenue per area, we see that the maximal value attained for each time of the day comes from city center, particularly from _Near North Side_ and _Loop_, values that are more than 5000$ most of the time. This could be due to the fact that people that pick a taxi from the city center have a long journey to do.
+
+### by drop-off areas of Chicago
+This section is similar to the previous one, but instead of looking at pickup areas, we look at drop-off areas and end time of each trip. As before, we can take a look at each hour of the day from 1 A.M. to 12 A.M.
+
+```{r shinyApp2, eval = FALSE}
+shinyApp(ui = ui, server = server2)
+```
+.orange[Please click: https://uberlu.shinyapps.io/Dropoff/]
+
+For the summation part, we can see quit the same as for the pickup map but the highest values are less concentrated in the city center and more scattered around it. We have the same conclusion for the airports.
+
+For the mean case, the values are a lot more homogeneous than for pickups and dispersed over all the city.
+
+For the maximal values, we see that the higher values appearing are from the city center to _Lake View_, an area in the north. As before, airports have high values.
+
+To conclude, this was a brief analyze of the basis data in order to have an idea of the situation for both pickup and drop-off. We see that it would be better to analyze deeper the pickup case if we wish to answer our questions.
+
+
+.
+]
+
+
+---
+
+## How can a driver earn more?
+.orange[By Olav]
+.scroll-output[
+
+From the map it is clear that a few areas generate a disproportionate amount of the revenue, with Loop, O'Hare and Near West Side being the most prominent. Does this imply that every driver should strive to spend as much time as possible in these areas?
+
+Not necessarily. The total revenue depends on several factors which differ between areas. For each area there are e.g. differences in population, movement of people and number of active taxis. Although an area generates the most money overall, it doesn't necessarily imply that each taxi driver is better off in that area. Just think of the large queues of taxis which are normal to see at airports - not exactly time efficient! 
+
+If we start by neglecting the variations of average trip time and revenue between areas, the average waiting time in each area will be a fairly good representation of how attractive the area is for each individual driver; as the drivers only earn money when having a passenger. We represent the average waiting time as the average time it takes from a taxi drops someone off in an area, until the same taxi picks someone else up in the same area. We  only consider pick-ups and drop-offs which happen in the same area. This is because taxis which travel from one area to another in between drop-off and pick-up will inflate the average time. This could potentially lead to the central areas getting higher averages, as taxi drivers are inclined to travel back to the city center after a drop-off. 
+
+We extract `taxi_id`, `trip_start_timestamp`, `trip_end_timestamp`, `pickup_community_area` and `dropoff_community_area` from our data set. `taxi_id` is an unique string identifier for each taxi and `pickup_community_area` and `dropoff_community_area` are identical to the previous description of `pickup_community_area`. `trip_start_timestamp` and `trip_end_time` stamp are date strings one the format **MM/DD/YYYY hh:mm:ss**, which indicates time of trip start and end. We note that the time stamps has been rounded to nearest 15 minute for privacy purposes. Therefore the result will not be 100% accurate, but it will give a good estimate of the true time to pickup. The results are shown below.  
+
+```{r, echo = FALSE}
+olav2
+```
+
+By considering average waiting time we get a fairly different picture. The revenue and activity plot previously pointed towards O'Hare and the central areas around Loop as the most attractive - or at least as generating the most money. We can now see that the taxis in these areas are more prone to waiting time, with O’Hare averaging 95 minutes between trips. This is probably an indication of higher competition. 
+
+However, none of these plots paint the whole picture on its own. Although the waiting time at O’Hare airport is large, a trip from the airport to the city center would generate much more revenue  than a trip from Loop to West Town. To take this into account we will go back to the factors we previously neglected; average trip total and average trip time. When combining these our goal is to get a measure of \textit{expected} revenue per hour. 
+
+We can decompose revenue per hour into: 
+
+\begin{align} 
+\textit{revenue per hour} = \frac{\textit{revenue per trip}}{\textit{time per trip}}
+\end{align}
+
+We will further view the time per trip as not only the length of the trip, but the sum of trip time and waiting time. We then obtain:
+
+\begin{align}
+\textit{revenue per hour} = \frac{\textit{revenue per trip}}{\textit{waiting time + trip time}}
+\end{align}
+
+To obtain the expected revenue per hour for each area, we simply calculate the average of the three components by area and combine them. To measure the accuracy of our estimator we used the library boot to generate 1000 random samples from each area, and calculate the average hourly rate. Since the function boot.ci didn't work on the data set, we extracted a 95% confidence interval by sorting the sampled values in each area, and taking the 25th and 975th largest values. The obtained result and code for bootstrapping can be viewed below.  
+
+```{r, echo=FALSE}
+olav3
+```
+
+.
+]
+
+<!-- .footnote[ -->
+<!-- By Yiren -->
+<!-- ] -->
+
+
+
+---
+
+## Why is it the case?
+.orange[By Yiren]
+.scroll-output[
+To find out the reason why specific zones generate most revenue as well as why some zones give less pick up time, we join several other dataset downloaded from Chicago governmental website and look for correlation among the factors.
+
+Initially when we plot the correlation out, we can clearly see outliners that greatly affect the correlation coefficient, hence we drop them and plot it again. For this plot, .orange[you can click on each cell and see a correlation between the variables]. Our dependent variable `trip_total` is placed at the last column, it has negative correlations with `percent_aged_under_18_or_over_64`, `percent_aged_25_without_high_school_diploma`, `percent_of_housing_crowded`, positive correlation with `per_capita_income`, `population` and `density`. As for `avg_pickup_time` placed at the second last column, it has a negative correlation with `percent_households_below_poverty` and `percent_aged_16_unemployed`.
+
+```{r, echo = FALSE, fig.width=12, fig.height=8, fig.align='right'}
+load("inter1.RData")
+interactive1
+```
+
+## Multiple Regression by Backward Model Selection
+
+
+<!-- ```{r, echo = FALSE} -->
+<!-- load("allvars_shape.RData") -->
+<!-- # load("test.RData") -->
+<!-- # tmap_mode("view") -->
+<!-- # df1 <- df1 %>% drop_na() %>% rename(population = Population.x) %>% st_as_sf() -->
+<!-- colnames(df1) -->
+<!-- p1 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "area") + -->
+<!--   tm_layout(title = "Chicago Area", title.size = 1, title.position = c("right", "TOP")) + -->
+<!--   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),) -->
+<!-- p2 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "per_capita_income") + -->
+<!--   tm_layout(title = "Chicago per_capita_income", title.size = 1, title.position = c("right", "TOP")) +tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),legend.title.size = 1, -->
+<!--           legend.text.size = 0.6, -->
+<!--           legend.bg.color = "white", -->
+<!--           # legend.digits = 5, -->
+<!--           legend.bg.alpha = 1) -->
+
+<!-- p3 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "population") + -->
+<!--   tm_layout(title = "Chicago population", title.size = 1, title.position = c("right", "TOP")) + -->
+<!--   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"), legend.title.size = 1, -->
+<!--           legend.text.size = 0.6, -->
+<!--           legend.bg.color = "white", -->
+<!--           # legend.digits = 5, -->
+<!--           legend.bg.alpha = 1) -->
+
+<!-- p4 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "percent_of_housing_crowded") + -->
+<!--   tm_layout(title = "Chicago percent_of_housing_crowded", title.size = 1, title.position = c("right", "TOP")) + -->
+<!--   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),) -->
+<!-- p5 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "percent_aged_16_unemployed") + -->
+<!--   tm_layout(title = "Chicago percent_aged_16_unemployed", title.size = 1, title.position = c("right", "TOP")) +tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),legend.title.size = 1, -->
+<!--           legend.text.size = 0.6, -->
+<!--           legend.bg.color = "white", -->
+<!--           # legend.digits = 5, -->
+<!--           legend.bg.alpha = 1) -->
+
+<!-- p6 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "percent_aged_25_without_high_school_diploma") + -->
+<!--   tm_layout(title = "Chicago percent_aged_25_without_high_school_diploma", title.size = 1, title.position = c("right", "TOP")) + -->
+<!--   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"), legend.title.size = 1, -->
+<!--           legend.text.size = 0.6, -->
+<!--           legend.bg.color = "white", -->
+<!--           # legend.digits = 5, -->
+<!--           legend.bg.alpha = 1) -->
+
+<!-- p7 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "percent_aged_under_18_or_over_64") + -->
+<!--   tm_layout(title = "Chicago percent_aged_under_18_or_over_64", title.size = 1, title.position = c("right", "TOP")) + -->
+<!--   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),) -->
+<!-- p8 = tm_shape(df1) + -->
+<!--   tm_polygons(col = "hardship_index") + -->
+<!--   tm_layout(title = "Chicago hardship_index", title.size = 1, title.position = c("right", "TOP")) +tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"),legend.title.size = 1, -->
+<!--           legend.text.size = 0.6, -->
+<!--           legend.bg.color = "white", -->
+<!--           # legend.digits = 5, -->
+<!--           legend.bg.alpha = 1) -->
+
+<!-- # p9 = tm_shape(df1) + -->
+<!-- #   tm_polygons(col = "percent_aged_16_unemployed") + -->
+<!-- #   tm_layout(title = "Chicago percent_aged_16_unemployed", title.size = 1, title.position = c("right", "TOP")) + -->
+<!-- #   tm_layout(frame.lwd = 3, legend.position = c("left", "bottom"), legend.title.size = 1, -->
+<!-- #           legend.text.size = 0.6, -->
+<!-- #           legend.bg.color = "white", -->
+<!-- #           # legend.digits = 5, -->
+<!-- #           legend.bg.alpha = 1) -->
+
+
+<!-- # tmap_mode("plot") -->
+
+<!-- ``` -->
+
+
+
+
+
+
+<!-- ```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.height=3, figwidth = 5} -->
+<!-- t1<- tmap_arrange(p1,p2,p3, ncol = 3) -->
+<!-- t2<- tmap_arrange(p4,p5,p6, ncol = 3) -->
+<!-- t3<- tmap_arrange(p7, p8, ncol = 2) -->
+<!-- ``` -->
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("./assets/8.png")
+knitr::include_graphics("./assets/9.png")
+knitr::include_graphics("./assets/10.png")
+```
+
+
+
+
+First, we perform multiple regression for trip_total. To find the most appropriate model, we start with the model containing all possible explanatory variables. And progressively, we remove the least informative variable and stop until all variables in the current model are significant when $\alpha = 0.05$.
+We do a backward search using Akaike Information Criterion (AIC) and get the following model.
+
+```{r, echo = FALSE, fig.width=6, fig.height=4}
+load("regression.RData")
+step.back.aic1
+t1
+```
+
+Therefore, we get
+$${\text{trip_total}} = 700722.131 + 3.136 \times \text{population} -27518.550 \times \text{percent_of_housing_crowded} + 19959.164 \times \text{percent_aged_16_unemployed} 
+-19294.557 \times \text{percent_aged_under_18_or_over_64}$$
+
+Since the P values for each variable and intercept are all less than 0.05, we keep all of them in our formula for calculating trip_total.
+
+```{r, echo = FALSE}
+t2
+```
+
+We get the adjusted r squared to be 0.42, which means 42% of the variance for the dependent variable `trip_total` can be explained by our independent variables, and hence it is a relatively good model.
+
+
+Then, we apply the same process on the `avg_pickup_time`.
+```{r,echo = FALSE}
+step.back.aic2
+t3
+
+```
+
+$${\text{avg_pickup_time}} = 15.2134 + 0.6735 \times \text{percent_of_housing_crowded} -0.1839  \times \text{percent_aged_25_without_high_school_diploma} + -0.1646   \times \text{percent_households_below_poverty} 
+-0.1300 \times \text{percent_aged_under_18_or_over_64}$$
+
+```{r,echo = FALSE}
+t4
+```
+
+We get a nice formula for `avg_pickup_time`, however, the  adjusted R squared is just 0.16, which indicates that it is not a good model and we need to find other factors to better explain `avg_pickup_time`, which also suggests a direction for our future work.
+
+
+.
+]
+
+
+
+
+<!-- --- -->
+<!-- ## Pre Analysis Observations -->
+
+
+<!-- There are ten variables in this dataset, as shown by the summary statistics: -->
+
+<!-- - Mean birth weight is approximately 2.9kg, about 600 grams below the expected mean of 3.5kg. This is within the normal range of weights of 2.5kg- -->
+
+
+
+
+<!-- .scroll-box-14[ -->
+<!-- ```{r, echo = FALSE, warning=FALSE} -->
+<!-- library(MASS) -->
+<!-- library(janitor) -->
+<!-- library(skimr) -->
+<!-- library(tidyr) -->
+<!-- library(readr) -->
+<!-- library(ggfortify) -->
+<!-- library(dplyr) -->
+<!-- library(tidyverse) -->
+<!-- library(ggplot2) -->
+<!-- library(visdat) -->
+<!-- library(sjPlot) -->
+<!-- library(leaps) -->
+<!-- library(caret) -->
+<!-- library(regclass) -->
+<!-- data = birthwt -->
+<!-- summary(data) -->
+<!-- ``` -->
+<!-- ] -->
+
+<!-- --- -->
+<!-- ## birthwt in R -->
+
+<!-- Here a glimpse of the data set we are going to use in the further research. -->
+
+
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- data = birthwt -->
+<!-- glimpse(data) -->
+<!-- ``` -->
+
+<!-- --- -->
+<!-- ### data handling -->
+<!-- # data -->
+<!-- .scroll-box-14[ -->
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- data = MASS::birthwt -->
+<!-- glimpse(data) -->
+<!-- summary(data) -->
+<!-- head(data) -->
+<!-- # data %>% skimr::skim() -->
+<!-- # visdat::vis_miss(data) -->
+
+<!-- data = data %>% mutate( -->
+<!--   low = as.factor(low), -->
+<!--   race = as.character(race), -->
+<!--   smoke = as.character(smoke), -->
+<!--   ui = as.character(ui), -->
+<!--   ht = as.character(ht) -->
+<!-- ) -->
+
+<!-- data_without_low = data %>% dplyr::select(-low) -->
+<!-- data_with_low = data -->
+<!-- ``` -->
+<!-- ] -->
+<!-- --- -->
+<!-- class: title-slide,middle -->
+<!-- background-image: url("assets/pika2.svg"), url("assets/title-image3.jpg") -->
+<!-- background-position: 10% 90%, 100% 50% -->
+<!-- background-size: 160px, 50% 100% -->
+<!-- background-color: #0148A4 -->
+
+
+<!-- # .text-shadow[.white[Assumption Checking]] -->
+
+<!-- ## .white[Yiren Cao] -->
+
+<!-- --- -->
+<!-- ## Assumption Checking - Linearity, Homoskedasticity -->
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=16, fig.height=15} -->
+
+<!-- data_without_low_for_correlation = data_without_low -->
+<!-- data_without_low_for_correlation[] <- lapply(data_without_low_for_correlation,  -->
+<!--                                              function(x) as.numeric(as.character(x))) -->
+<!-- {{qtlcharts::iplotCorr(data_without_low_for_correlation)}} # non-multicollinearity -->
+
+<!-- ``` -->
+
+<!-- --- -->
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8} -->
+<!-- GGally::ggpairs(data_without_low) -->
+<!-- ``` -->
+
+<!-- --- -->
+<!-- ## Assumption Checking - Linearity, Homoskedasticity, Normality -->
+
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6} -->
+<!-- lm1_without_low = lm(bwt ~ ., data = data_without_low) -->
+<!-- autoplot(lm1_without_low, which = 1:2) # linearity + normality -->
+
+
+<!-- ``` -->
+
+<!-- ```{r, echo = FALSE} -->
+<!-- icon::fa("bell") -->
+<!-- ``` -->
+
+<!-- - In addition, we can assume the Independence! -->
+
+<!-- --- -->
+<!-- ## Assumption Checking - No Multicollinearity -->
+
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=5} -->
+<!-- M1 = lm1_without_low  # Full model -->
+<!-- vif_values <- regclass::VIF(M1) -->
+<!-- vif_values -->
+
+<!-- ``` -->
+
+<!-- .blockquote[ -->
+<!-- ### `r icon::fa("location-arrow")` Variance Inflation Factor (VIF) -->
+<!-- - when VIF is equal to 1, the independent variables are not correlated to the one another -->
+<!-- ] -->
+
+<!-- --- -->
+<!-- class: inverse, center, middle -->
+<!-- # Another model: with `low` predictor -->
+
+
+<!-- --- -->
+<!-- ## Assumption Checking - Linearity, Homoskedasticity, Normality -->
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6} -->
+<!-- reg1 = lm(bwt ~ ., data = data_with_low) -->
+<!-- autoplot(reg1, which = 1:2) -->
+<!-- ``` -->
+
+<!-- ```{r, echo = FALSE} -->
+<!-- icon::fa("bell") -->
+<!-- ``` -->
+
+<!-- - In addition, we can assume the Independence! -->
+
+<!-- --- -->
+<!-- ## Assumption Checking - No Multicollinearity -->
+
+<!-- ```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5} -->
+<!-- vif_values_with_low <- regclass::VIF(reg1) -->
+<!-- vif_values_with_low -->
+<!-- ``` -->
+
+
+
+
+
+<!-- --- -->
+<!-- Please add analysis here -->
+
+<!-- --- -->
+<!-- class: title-slide,middle -->
+<!-- background-image: url("assets/pika2.svg"), url("assets/title-image2.jpg") -->
+<!-- background-position: 10% 90%, 100% 50% -->
+<!-- background-size: 160px, 50% 100% -->
+<!-- background-color: #0148A4 -->
+
+
+<!-- # .text-shadow[.white[Model Selection]] -->
+<!-- # .text-shadow[.white[Assumption Re-check]] -->
+
+<!-- ## .white[Yiren Cao] -->
+
+<!-- --- -->
+
+<!-- ## Model Selection -->
+
+<!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=5, fig.height=5} -->
+<!-- cv_with_low = train( -->
+<!--   bwt ~ low + ui+ smoke + race, data, -->
+<!--   method = "lm", -->
+<!--   trControl = trainControl( -->
+<!--     method = "cv", number = 10, -->
+<!--     verboseIter = FALSE -->
+<!--   ) -->
+<!-- ) -->
+<!-- cv_without_low = train( -->
+<!--   bwt ~ lwt + race + smoke + ht+ ui, data_without_low, -->
+<!--   method = "lm", -->
+<!--   trControl = trainControl( -->
+<!--     method = "cv", number = 10, -->
+<!--     verboseIter = FALSE -->
+<!--   ) -->
+<!-- ) -->
+<!-- # cv_without_low -->
+<!-- # cv_with_low -->
+
+
+<!-- results = resamples(list(without_low = cv_without_low, with_low = cv_with_low)) -->
+<!-- ggplot(results, metric = "RMSE") + labs(y = "RMSE") -->
+<!-- ggplot(results, metric = "MAE") + labs(y = "MAE") -->
+<!-- ggplot(results, metric = "Rsquared") + labs(y = "R squared") -->
+
+
+<!-- icon::fa("spinner", size = 2, animate = "spin") -->
+<!-- ``` -->
+
+
+<!-- --- -->
+<!-- ## Assumption Re-check -->
+<!-- ```{r,  echo = FALSE, fig.width=10, fig.height=5} -->
+<!-- step.back.aic = step(M1, direction = "backward", trace = FALSE) -->
+<!-- autoplot(step.back.aic, which = 1:2) -->
+<!-- vif_values_without_low <- regclass::VIF(step.back.aic) -->
+<!-- vif_values_without_low -->
+<!-- ``` -->
+
+
+
